@@ -4,13 +4,18 @@ import numpy as np
 import joblib
 import os
 
-# Load the models and scalers
-diabetes_model = joblib.load( 'diabetespred_model.sav')
-heart_disease_model = joblib.load( 'heart_disease_model.sav')
-parkinsons_model = joblib.load( 'parkinsons_model.sav')
-diabetes_scaler = joblib.load('diabetes_scaler.sav')
-heart_scaler = joblib.load( 'heart_scaler.sav')
-parkinsons_scaler = joblib.load( 'parkinsons_scaler.sav')
+# Load the models and scalers with error handling
+try:
+    
+    diabetes_model = joblib.load( 'diabetespred_model.sav')
+    heart_disease_model = joblib.load('heart_disease_model.sav')
+    parkinsons_model = joblib.load('parkinsons_model.sav')
+    diabetes_scaler = joblib.load( 'diabetes_scaler.sav')
+    heart_scaler = joblib.load( 'heart_scaler.sav')
+    parkinsons_scaler = joblib.load('parkinsons_scaler.sav')
+except Exception as e:
+    st.error(f"Error loading models: {str(e)}")
+    st.stop()
 
 # sidebar for navigation
 with st.sidebar:
@@ -59,21 +64,36 @@ if selected == 'Diabetes Prediction':
     # creating a button for Prediction
     if st.button('Diabetes Test Result'):
         try:
-            # Convert input to float
+            # Convert input to float and validate
             user_input = [float(Pregnancies), float(Glucose), float(BloodPressure), 
                          float(SkinThickness), float(Insulin), float(BMI), 
                          float(DiabetesPedigreeFunction), float(Age)]
             
+            # Validate input ranges
+            if any(x < 0 for x in user_input):
+                st.error("All values must be non-negative")
+                st.stop()
+            
             # Scale the features
             features_scaled = diabetes_scaler.transform([user_input])
-            diab_prediction = diabetes_model.predict(features_scaled)
             
-            if diab_prediction[0] == 1:
-                diab_diagnosis = 'The person is diabetic'
-            else:
-                diab_diagnosis = 'The person is not diabetic'
+            # Convert to numpy array if needed
+            features_scaled = np.array(features_scaled)
             
-            st.success(diab_diagnosis)
+            # Ensure correct shape
+            if len(features_scaled.shape) == 1:
+                features_scaled = features_scaled.reshape(1, -1)
+            
+            try:
+                diab_prediction = diabetes_model.predict(features_scaled)
+                if diab_prediction[0] == 1:
+                    diab_diagnosis = 'The person is diabetic'
+                else:
+                    diab_diagnosis = 'The person is not diabetic'
+                st.success(diab_diagnosis)
+            except Exception as e:
+                st.error(f"Prediction error: {str(e)}")
+                
         except ValueError:
             st.error("Please enter valid numerical values for all fields")
 
@@ -135,20 +155,28 @@ elif selected == 'Heart Disease Prediction':
     
     # creating a button for Prediction
     if st.button('Heart Disease Test Result'):
-
-         # Convert input to float
-        user_input = [age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal]
-
-        user_input = [float(x) for x in user_input]
-
-        heart_prediction = heart_disease_model.predict([user_input])
-
-        if heart_prediction[0] == 1:
-            heart_diagnosis = 'The person is having heart disease'
-        else:
-            heart_diagnosis = 'The person does not have any heart disease'
-
-    st.success(heart_diagnosis)
+        try:
+            user_input = [float(x) for x in [age, sex, cp, trestbps, chol, fbs, 
+                         restecg, thalach, exang, oldpeak, slope, ca, thal]]
+            
+            # Scale the features if needed
+            try:
+                features_scaled = heart_scaler.transform([user_input])
+                heart_prediction = heart_disease_model.predict(features_scaled)
+            except:
+                # If scaling fails, try without scaling
+                heart_prediction = heart_disease_model.predict([user_input])
+            
+            if heart_prediction[0] == 1:
+                heart_diagnosis = 'The person is having heart disease'
+            else:
+                heart_diagnosis = 'The person does not have any heart disease'
+            st.success(heart_diagnosis)
+            
+        except ValueError:
+            st.error("Please enter valid numerical values for all fields")
+        except Exception as e:
+            st.error(f"Prediction error: {str(e)}")
             
 # Parkinsons Prediction Page
 else:
@@ -229,22 +257,27 @@ else:
     # creating a button for Prediction    
     if st.button("Parkinson's Test Result"):
         try:
-            # Convert input to float
-            features = [float(fo), float(fhi), float(flo), float(Jitter_percent),
-                       float(Jitter_Abs), float(RAP), float(PPQ), float(DDP),
-                       float(Shimmer), float(Shimmer_dB), float(APQ3), float(APQ5),
-                       float(APQ), float(DDA), float(NHR), float(HNR), float(RPDE),
-                       float(DFA), float(spread1), float(spread2), float(D2), float(PPE)]
+            features = [float(x) for x in [fo, fhi, flo, Jitter_percent, Jitter_Abs,
+                       RAP, PPQ, DDP, Shimmer, Shimmer_dB, APQ3, APQ5, APQ, DDA,
+                       NHR, HNR, RPDE, DFA, spread1, spread2, D2, PPE]]
             
             # Scale the features
             features_scaled = parkinsons_scaler.transform([features])
-            parkinsons_prediction = parkinsons_model.predict(features_scaled)
             
-            if parkinsons_prediction[0] == 1:
-                parkinsons_diagnosis = "The person has Parkinson's disease"
-            else:
-                parkinsons_diagnosis = "The person does not have Parkinson's disease"
+            # Ensure correct shape
+            features_scaled = np.array(features_scaled)
+            if len(features_scaled.shape) == 1:
+                features_scaled = features_scaled.reshape(1, -1)
             
-            st.success(parkinsons_diagnosis)
+            try:
+                parkinsons_prediction = parkinsons_model.predict(features_scaled)
+                if parkinsons_prediction[0] == 1:
+                    parkinsons_diagnosis = "The person has Parkinson's disease"
+                else:
+                    parkinsons_diagnosis = "The person does not have Parkinson's disease"
+                st.success(parkinsons_diagnosis)
+            except Exception as e:
+                st.error(f"Prediction error: {str(e)}")
+                
         except ValueError:
             st.error("Please enter valid numerical values for all fields")
