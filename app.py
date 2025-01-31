@@ -3,15 +3,35 @@ from streamlit_option_menu import option_menu
 import numpy as np
 import joblib
 import os
+from sklearn.base import BaseEstimator
 
-# Load the models and scalers with error handling
-try:
+# Create a wrapper class for older scikit-learn models
+class ModelCompatibilityWrapper(BaseEstimator):
+    def __init__(self, model):
+        self.model = model
     
-    diabetes_model = joblib.load( 'diabetespred_model.sav')
-    heart_disease_model = joblib.load('heart_disease_model.sav')
-    parkinsons_model = joblib.load('parkinsons_model.sav')
-    diabetes_scaler = joblib.load( 'diabetes_scaler.sav')
-    heart_scaler = joblib.load( 'heart_scaler.sav')
+    def predict(self, X):
+        # Handle the prediction without using newer attributes
+        try:
+            return self.model.predict(X)
+        except AttributeError:
+            # If the model is a tree-based model
+            if hasattr(self.model, 'estimators_'):
+                predictions = []
+                for tree in self.model.estimators_:
+                    pred = tree.predict(X)
+                    predictions.append(pred)
+                return np.round(np.mean(predictions, axis=0))
+            # If it's a single tree
+            return self.model.predict(X)
+
+# Load and wrap models
+try:
+    diabetes_model = ModelCompatibilityWrapper(joblib.load('diabetespred_model.sav'))
+    heart_disease_model = ModelCompatibilityWrapper(joblib.load('heart_disease_model.sav'))
+    parkinsons_model = ModelCompatibilityWrapper(joblib.load('parkinsons_model.sav'))
+    diabetes_scaler = joblib.load('diabetes_scaler.sav')
+    heart_scaler = joblib.load('heart_scaler.sav')
     parkinsons_scaler = joblib.load('parkinsons_scaler.sav')
 except Exception as e:
     st.error(f"Error loading models: {str(e)}")
